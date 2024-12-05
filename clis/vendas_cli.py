@@ -1,87 +1,100 @@
-from models.computador_model import Computador
+import time
+from tabulate import tabulate
+from models.vendas_model import Venda
 
 
-class ComputadorCLI:
-    def __init__(self):
-        self.computadores = {}
+class VendaCLI:
+    def __init__(self, cliente_db, computador_db, venda_db):
+        self.cliente_db = cliente_db
+        self.computador_db = computador_db
+        self.venda_db = venda_db
 
-    def adicionar_computador(self):
+    def _exibir_tabela(self, headers, data):
+        if not data:
+            print("Nenhum dado disponível")
+            return
+        print(tabulate(data, headers=headers, tablefmt="grid"))
+
+    def registrar_venda(self):
         try:
-            codigo = int(input("Código do computador: "))
-            if codigo in self.computadores:
-                print("Código já existe. Tente outro.")
+            cliente_cpf = input("Informe o CPF do cliente: ")
+            cliente = self.cliente_db.collection.find_one({"cpf": cliente_cpf})
+            if not cliente:
+                print("Cliente não encontrado no banco de dados. Registre-o primeiro!")
                 return
 
-            quantidade = int(input("Quantidade: "))
-            custo_unitario = float(input("Custo unitário: "))
-            preco_unitario = float(input("Preço unitário: "))
-            memoria_ram = input("Memória RAM: ")
-            armazenamento = input("Armazenamento: ")
-            processador = input("Processador: ")
-            placa_mae = input("Placa mãe: ")
-            placa_de_video = input("Placa de vídeo: ")
+            computador_codigo = int(input("Informe o código do computador: "))
+            computador = self.computador_db.collection.find_one({"codigo": computador_codigo})
+            if not computador:
+                print("Computador não encontrado no banco de dados. Registre-o primeiro!")
+                return
 
-            computador = Computador(
-                codigo, quantidade, custo_unitario, preco_unitario,
-                memoria_ram, armazenamento, processador, placa_mae, placa_de_video
+            elif computador["quantidade"] <= 0:
+                print("Computador sem estoque")
+                return
+
+            lucro = computador["preco_unitario"] - computador["custo_unitario"]
+
+            novo_estoque = computador["quantidade"] - 1
+
+            self.computador_db.collection.update_one(
+                {"codigo": computador_codigo}, {"$set": {"quantidade": novo_estoque}}
             )
-            self.computadores[codigo] = computador
-            print("Computador adicionado com sucesso!")
+
+            venda = Venda(
+                cliente_cpf=cliente_cpf,
+                computador_codigo=computador_codigo,
+                quantidade=1,
+                lucro=lucro
+            )
+            self.venda_db.collection.insert_one(venda.__dict__)
+            print("Venda registrada com sucesso!")
+
         except ValueError:
-            print("Erro: Entrada inválida. Tente novamente.")
+            print("Erro: Entrada inválida.")
 
-
-    def listar_computadores(self):
-        if not self.computadores:
-            print("Nenhum computador cadastrado.")
+    def listar_vendas(self):
+        vendas = self.venda_db.collection.find()
+        if not vendas:
+            print("Nenhuma venda registrada.")
             return
 
-        print("\nLista de computadores:")
-        for computador in self.computadores.values():
-            print(computador)
+        print("\nLista de vendas:")
+        headers = ["Cliente (CPF)", "Computador (Código)", "Quantidade", "Data", "Lucro"]
+        data = []
+        for venda in vendas:
+            venda.pop('_id', None)
+            data.append([
+                venda["cliente_cpf"],
+                venda["computador_codigo"],
+                venda["quantidade"],
+                venda["data"],
+                f"R$ {venda['lucro']:.2f}",
+            ])
+        self._exibir_tabela(headers, data)
+        time.sleep(2)
 
-
-    def editar_computador(self):
+    def remover_venda(self):
         try:
-            codigo = int(input("Informe o código do computador que deseja editar: "))
-            if codigo not in self.computadores:
-                print("Computador não encontrado.")
+            cliente_cpf = input("Informe o CPF do cliente da venda que deseja remover: ")
+            computador_codigo = int(input("Informe o código do computador da venda que deseja remover: "))
+
+            venda = self.venda_db.collection.find_one({"cliente_cpf": cliente_cpf, "computador_codigo": computador_codigo})
+            if not venda:
+                print("Venda não encontrada no banco de dados.")
                 return
 
-            print("Deixe o campo vazio para manter o valor atual.")
-            computador = self.computadores[codigo]
-
-            quantidade = input(f"Quantidade [{computador.quantidade}]: ")
-            custo_unitario = input(f"Custo unitário [{computador.custo_unitario:.2f}]: ")
-            preco_unitario = input(f"Preço unitário [{computador.preco_unitario:.2f}]: ")
-            memoria_ram = input(f"Memória RAM [{computador.memoria_ram}]: ")
-            armazenamento = input(f"Armazenamento [{computador.armazenamento}]: ")
-            processador = input(f"Processador [{computador.processador}]: ")
-            placa_mae = input(f"Placa mãe [{computador.placa_mae}]: ")
-            placa_de_video = input(f"Placa de vídeo [{computador.placa_de_video}]: ")
-
-            computador.quantidade = int(quantidade) if quantidade else computador.quantidade
-            computador.custo_unitario = float(custo_unitario) if custo_unitario else computador.custo_unitario
-            computador.preco_unitario = float(preco_unitario) if preco_unitario else computador.preco_unitario
-            computador.memoria_ram = memoria_ram if memoria_ram else computador.memoria_ram
-            computador.armazenamento = armazenamento if armazenamento else computador.armazenamento
-            computador.processador = processador if processador else computador.processador
-            computador.placa_mae = placa_mae if placa_mae else computador.placa_mae
-            computador.placa_de_video = placa_de_video if placa_de_video else computador.placa_de_video
-
-            print("Computador atualizado com sucesso!")
-        except ValueError:
-            print("Erro: Entrada inválida. Tente novamente.")
-
-
-    def remover_computador(self):
-        try:
-            codigo = int(input("Informe o código do computador que deseja remover: "))
-            if codigo not in self.computadores:
-                print("Computador não encontrado.")
+            computador = self.computador_db.collection.find_one({"codigo": computador_codigo})
+            if not computador:
+                print("Erro: Computador associado à venda não encontrado no banco de dados.")
                 return
 
-            del self.computadores[codigo]
-            print("Computador removido com sucesso!")
+            self.computador_db.collection.update_one(
+                {"codigo": computador_codigo}, {"$set": {"quantidade": computador["quantidade"] + 1}}
+            )
+
+            self.venda_db.collection.delete_one({"_id": venda["_id"]})
+            print("Venda removida com sucesso, e o estoque foi atualizado!")
+
         except ValueError:
-            print("Erro: Entrada inválida. Tente novamente.")
+            print("Erro: Entrada inválida.")

@@ -8,7 +8,6 @@ class ComputadorCLI:
     def __init__(self, computador_db):
         self.db = computador_db
 
-    # Somente pra exibir melhor os dados com tabulate
     def _exibir_tabela(self, headers, data):
         if not data:
             print("Nenhum dado disponível")
@@ -17,6 +16,7 @@ class ComputadorCLI:
 
     def adicionar_computador(self):
         try:
+            # Verificando existência
             codigo = int(input("Código do computador: "))
             if self.db.collection.find_one({"codigo": codigo}):
                 print("Código já existe no banco de dados. Tente outro.")
@@ -43,11 +43,11 @@ class ComputadorCLI:
                 placa_de_video=placa_de_video,
             )
 
-            # Salvar no banco de dados convertendo para dicionário
+            # Salvando e convertendo para dicionário
             self.db.collection.insert_one(computador.__dict__)
-            print("Computador adicionado com sucesso ao banco de dados!")
+            print("Computador adicionado com sucesso!")
         except ValueError:
-            print("Erro: Entrada inválida. Tente novamente.")
+            print("Erro: Entrada inválida")
 
     def listar_computadores(self):
         computadores = self.db.collection.find()
@@ -82,15 +82,15 @@ class ComputadorCLI:
 
         time.sleep(2)
 
-
     def editar_computador(self):
         try:
             codigo = int(input("Informe o código do computador que deseja editar: "))
-            computador_data = self.db.find_one({"codigo": codigo})
+            computador_data = self.db.collection.find_one({"codigo": codigo})
             if not computador_data:
                 print("Computador não encontrado no banco de dados.")
                 return
 
+            computador_data.pop('_id', None)
             computador = Computador(**computador_data)
 
             print("Deixe o campo vazio para manter o valor atual.")
@@ -104,7 +104,6 @@ class ComputadorCLI:
             placa_mae = input(f"Placa mãe [{computador.placa_mae}]: ")
             placa_de_video = input(f"Placa de vídeo [{computador.placa_de_video}]: ")
 
-            # Atualizar os atributos do objeto
             computador.quantidade = int(quantidade) if quantidade else computador.quantidade
             computador.custo_unitario = float(custo_unitario) if custo_unitario else computador.custo_unitario
             computador.preco_unitario = float(preco_unitario) if preco_unitario else computador.preco_unitario
@@ -115,18 +114,18 @@ class ComputadorCLI:
             computador.placa_de_video = placa_de_video if placa_de_video else computador.placa_de_video
 
             # Atualizar no banco de dados
-            self.db.update_one({"codigo": codigo}, {"$set": computador.__dict__})
+            self.db.collection.update_one({"codigo": codigo}, {"$set": computador.__dict__})
             print("Computador atualizado com sucesso no banco de dados!")
         except ValueError:
-            print("Erro: Entrada inválida. Tente novamente.")
+            print("Erro: Entrada inválida.")
 
     def remover_computador(self):
         try:
             codigo = int(input("Informe o código do computador que deseja remover: "))
-            resultado = self.db.delete_one({"codigo": codigo})
+            resultado = self.db.collection.delete_one({"codigo": codigo})
             if resultado.deleted_count == 0:
                 print("Computador não encontrado no banco de dados.")
             else:
                 print("Computador removido com sucesso do banco de dados!")
         except ValueError:
-            print("Erro: Entrada inválida. Tente novamente.")
+            print("Erro: Entrada inválida.")

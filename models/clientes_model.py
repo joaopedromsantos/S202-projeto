@@ -1,4 +1,4 @@
-class Comprador:
+class Cliente:
     def __init__(self, nome, email, cpf):
         self.nome = nome
         self.email = email
